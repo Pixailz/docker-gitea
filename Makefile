@@ -3,7 +3,7 @@ DC			:= $(D) compose
 
 VD			:= /opt/docker/gitea
 
-ENV_FILE	:= ./docker/.env
+ENV_FILE	:= ./.env
 
 ## FUNCTION TO SET A VALUE, GIVEN A VARIABLE ON THE $(ENV_FILE)
 SET_PASS			= \
