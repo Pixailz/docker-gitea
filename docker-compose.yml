@@ -1,0 +1,113 @@
+version: "3.9"
+
+################################################################################
+# DEFAULT CONF https://stackoverflow.com/a/65522511
+
+x-healthcheck_conf: &healthcheck_conf
+      interval: 5s
+      retries: 30
+
+x-restart: &restart
+    restart: on-failure
+
+################################################################################
+
+services:
+  ##############################################################################
+  # PostgreSQL
+  postgresql:
+    container_name: postgresql
+    build:
+      context: "./postgresql"
+      target: "packed"
+    environment:
+      - DB_USER=${DB_USER?}
+      - DB_PASS=${DB_PASS?}
+      - DB_NAME=${DB_NAME?}
+      - PGDATA=/usr/local/pgsql/data
+      - DEBUG_ENTRYPOINT=${DEBUG_ENTRYPOINT?}
+    networks:
+      gitea:
+        ipv4_address: "13.37.1.1"
+    volumes:
+      - type: bind
+        source: /opt/docker/gitea/postgresql
+        target: /usr/local/pgsql/data
+        bind:
+          create_host_path: true
+    << : *restart
+    healthcheck:
+      test: "nc -w 1 127.0.0.1 5432"
+      << : *healthcheck_conf
+  #
+  ##############################################################################
+
+  ##############################################################################
+  # Gitea
+  gitea:
+    container_name: gitea
+    build:
+      context: "./gitea"
+      target: "packed"
+    networks:
+      gitea:
+        ipv4_address: "13.37.1.2"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    ports:
+      - 3000:3000
+      - 20022:20022
+    volumes:
+      - type: bind
+        source: /opt/docker/gitea/config
+        target: /etc/gitea
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /opt/docker/gitea/core
+        target: /var/lib/gitea
+        bind:
+          create_host_path: true
+    << : *restart
+    healthcheck:
+      test: "nc -w 1 127.0.0.1 3000"
+      << : *healthcheck_conf
+  #
+  ##############################################################################
+
+  ##############################################################################
+  # Gitea Runner (Actions)
+  gitea-runner:
+    container_name: gitea-runner
+    image: gitea/act_runner:latest
+    environment:
+      GITEA_INSTANCE_URL: "http://gitea:3000"
+      GITEA_RUNNER_REGISTRATION_TOKEN: "${REGISTRATION_TOKEN}"
+    networks:
+      gitea:
+        ipv4_address: "13.37.1.3"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      gitea:
+        condition: service_healthy
+    << : *restart
+    #healthcheck:
+    #  test: "nc -w 1 127.0.0.1 3000"
+    #  << : *healthcheck_conf
+  #
+  ##############################################################################
+
+networks:
+  gitea:
+    name: gitea
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: gitea
+    ipam:
+      driver: default
+      config:
+        - subnet: 13.37.1.0/28
+          ip_range: 13.37.1.0/28
+          gateway: 13.37.1.14

@@ -1,0 +1,13 @@
+#!/bin/ash -x
+
+chown -R gitea:www-data /var/lib/gitea
+chmod -R 755 /var/lib/gitea
+chown -R gitea:www-data /etc/gitea
+chmod -R 755 /etc/gitea
+
+if [ "${#}" == "0" ]; then
+	su - gitea -c "gitea"
+else
+	exec ${@}
+fi
+
